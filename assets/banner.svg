@@ -1,0 +1,43 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="vibewithsnehal — AI, made human">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#020617"/>
+      <stop offset="0.45" stop-color="#0a1628"/>
+      <stop offset="1" stop-color="#0c4a6e"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="640" y1="120" x2="1010" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="0.5" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#93c5fd"/>
+    </linearGradient>
+    <radialGradient id="blobCyan" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#0ea5e9" stop-opacity="0.55"/>
+      <stop offset="0.65" stop-color="#0ea5e9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="blobBlue" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#1e40af" stop-opacity="0.5"/>
+      <stop offset="0.65" stop-color="#1e40af" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glyph" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#1e3a8a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="300" rx="0" fill="url(#bg)"/>
+  <circle cx="1080" cy="60" r="260" fill="url(#blobCyan)"/>
+  <circle cx="180" cy="280" r="240" fill="url(#blobBlue)"/>
+
+  <!-- logo glyph: lowercase v in rounded square -->
+  <rect x="80" y="110" width="80" height="80" rx="22" fill="url(#glyph)"/>
+  <path d="M104 132 L120 168 L136 132" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- wordmark -->
+  <text x="190" y="166" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="62" font-weight="500" fill="#ffffff" letter-spacing="-2">vibewith<tspan font-weight="800" fill="url(#accent)">snehal</tspan></text>
+
+  <!-- tagline eyebrow -->
+  <text x="192" y="212" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" font-weight="800" fill="#7dd3fc" letter-spacing="7">AI · MADE HUMAN</text>
+
+  <!-- thin accent rule -->
+  <rect x="192" y="228" width="300" height="3" rx="1.5" fill="url(#accent)" opacity="0.65"/>
+</svg>
