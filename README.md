@@ -7,7 +7,7 @@
 I work at the intersection of **applied AI** and **healthcare**: multi-agent systems, RAG, and LLM tooling that ships. On the side, I run **vibewithsnehal** — turning dense AI concepts into plain English for a general audience.
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-vibewithsnehal-0a1628?style=flat-square&logo=linkedin&logoColor=38bdf8)](https://www.linkedin.com/in/vibewithsnehal)
-[![Website](https://img.shields.io/badge/Website-vibewithsnehal-0a1628?style=flat-square&logo=googlechrome&logoColor=38bdf8)](https://vibewithsnehal.com)
+[![Website](https://img.shields.io/badge/Website-snehaltalati.com-0a1628?style=flat-square&logo=googlechrome&logoColor=38bdf8)](https://www.snehaltalati.com)
 [![Email](https://img.shields.io/badge/Email-say%20hi-0a1628?style=flat-square&logo=gmail&logoColor=38bdf8)](mailto:snehal.talati@boostaro.com)
 
 </div>
@@ -43,8 +43,9 @@ I work at the intersection of **applied AI** and **healthcare**: multi-agent sys
 
 <div align="center">
 
-<img height="165" src="https://github-readme-stats.vercel.app/api?username=vibewithsnehal&show_icons=true&hide_border=true&title_color=38bdf8&icon_color=7dd3fc&text_color=cbd5e1&bg_color=0a1628" alt="GitHub stats" />
-<img height="165" src="https://github-readme-stats.vercel.app/api/top-langs/?username=vibewithsnehal&layout=compact&hide_border=true&title_color=38bdf8&text_color=cbd5e1&bg_color=0a1628" alt="Top languages" />
+**What I'm focused on**
+
+🤖 Multi-agent systems & LLM tooling that ships  ·  🩺 Applied AI in healthcare  ·  📣 Making AI make sense [@vibewithsnehal](https://www.linkedin.com/in/vibewithsnehal)
 
 <br/><br/>
 
