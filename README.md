@@ -33,6 +33,7 @@ I work at the intersection of **applied AI** and **healthcare**: multi-agent sys
 
 | Project | What it does |
 | :-- | :-- |
+| **[508-checker](https://github.com/vibewithsnehal/508-checker)** | Section 508 / WCAG accessibility scanner for PDF, Office docs, images & HTML — 100% local, with AI review via a self-hosted Ollama model. |
 | **[afib-patient-level-screening](https://github.com/vibewithsnehal/afib-patient-level-screening)** | Patient-level atrial fibrillation screening from wearable single-lead ECG — real, non-extrapolated false-positive rates. |
 | **[medical-device-complaints](https://github.com/vibewithsnehal/medical-device-complaints)** | Medical-device complaint pipeline with multi-agent AI processing, FDA triage, and AWS AgentCore deployment. |
 | **[hutch-connector](https://github.com/vibewithsnehal/hutch-connector)** | Matches a capabilities statement to ranked SAM.gov opportunities, with a live agentic (LangChain) bid checklist. |
