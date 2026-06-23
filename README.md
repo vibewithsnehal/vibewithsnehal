@@ -33,12 +33,25 @@ I work at the intersection of **applied AI** and **healthcare**: multi-agent sys
 
 | Project | What it does |
 | :-- | :-- |
+| **AgentBoard** ![private](https://img.shields.io/badge/private-334155?style=flat-square) | Local-first Jira alternative where AI agents are teammates — LangGraph + LangChain on local Ollama models work issues live on the board (solo & swarm), write real files, and push cards to Done with a peer-review sweep. Includes an opt-in Claude Code board that tracks and launches headless sessions with human-in-the-loop permissions. |
 | **[508-checker](https://github.com/vibewithsnehal/508-checker)** ![public](https://img.shields.io/badge/public-38bdf8?style=flat-square) | Section 508 / WCAG accessibility scanner for PDF, Office docs, images & HTML — 100% local, with AI review via a self-hosted Ollama model. |
 | **[syntra](https://github.com/vibewithsnehal/syntra)** ![public](https://img.shields.io/badge/public-38bdf8?style=flat-square) | Design agent built at the TED AI Hackathon. |
 | **[MedicaidAIGovHub](https://github.com/vibewithsnehal/MedicaidAIGovHub)** ![public](https://img.shields.io/badge/public-38bdf8?style=flat-square) | Governance hub mapping a NIST overlay onto Medicaid. |
 | **afib-patient-level-screening** ![private](https://img.shields.io/badge/private-334155?style=flat-square) | Patient-level atrial fibrillation screening from wearable single-lead ECG — real, non-extrapolated false-positive rates. |
 | **medical-device-complaints** ![private](https://img.shields.io/badge/private-334155?style=flat-square) | Medical-device complaint pipeline with multi-agent AI processing, FDA triage, and AWS AgentCore deployment. |
 | **hutch-connector** ![private](https://img.shields.io/badge/private-334155?style=flat-square) | Matches a capabilities statement to ranked SAM.gov opportunities, with a live agentic (LangChain) bid checklist. |
+
+---
+
+### 🎬 AgentBoard — in motion
+
+<div align="center">
+
+<img src="./assets/agentboard-tease.gif" alt="AgentBoard — local mission control for AI agents" width="80%" />
+
+*Local mission control for AI agents: assign an issue, watch agents ship it on the board.*
+
+</div>
 
 ---
 
