@@ -1,0 +1,168 @@
+{
+  "summary": {
+    "rallies": 4,
+    "total_bounces_called": 9,
+    "in": 7,
+    "out": 2,
+    "close_calls": 2,
+    "longest_rally_shots": 3,
+    "avg_rally_duration_s": 3.21,
+    "avg_shot_speed_kmh": 33.6,
+    "max_shot_speed_kmh": 45.9
+  },
+  "rallies": [
+    {
+      "index": 1,
+      "start_frame": 30,
+      "end_frame": 170,
+      "shots": 3,
+      "bounces": 3,
+      "duration_s": 4.67,
+      "terminal_call": "OUT",
+      "avg_shot_speed_kmh": 39.0
+    },
+    {
+      "index": 2,
+      "start_frame": 216,
+      "end_frame": 354,
+      "shots": 3,
+      "bounces": 3,
+      "duration_s": 4.6,
+      "terminal_call": "IN",
+      "avg_shot_speed_kmh": 34.7
+    },
+    {
+      "index": 3,
+      "start_frame": 406,
+      "end_frame": 487,
+      "shots": 2,
+      "bounces": 2,
+      "duration_s": 2.7,
+      "terminal_call": "OUT",
+      "avg_shot_speed_kmh": 20.5
+    },
+    {
+      "index": 4,
+      "start_frame": 549,
+      "end_frame": 575,
+      "shots": 1,
+      "bounces": 1,
+      "duration_s": 0.87,
+      "terminal_call": "IN",
+      "avg_shot_speed_kmh": null
+    }
+  ],
+  "calls": [
+    {
+      "frame": 62,
+      "court_x_m": 7.469,
+      "court_y_m": 18.089,
+      "decision": "IN",
+      "margin_cm": 216.4,
+      "confidence": 0.987,
+      "zone": "far-short-right",
+      "context": "rally",
+      "nearest_line": "right-edge"
+    },
+    {
+      "frame": 110,
+      "court_x_m": 3.403,
+      "court_y_m": 4.426,
+      "decision": "IN",
+      "margin_cm": 206.6,
+      "confidence": 1.0,
+      "zone": "near-mid-left",
+      "context": "rally",
+      "nearest_line": "left-edge"
+    },
+    {
+      "frame": 157,
+      "court_x_m": 6.759,
+      "court_y_m": 24.096,
+      "decision": "OUT",
+      "margin_cm": -29.3,
+      "confidence": 0.242,
+      "zone": "far-deep-center",
+      "context": "rally",
+      "nearest_line": "far-edge"
+    },
+    {
+      "frame": 247,
+      "court_x_m": 3.95,
+      "court_y_m": 17.051,
+      "decision": "IN",
+      "margin_cm": 261.3,
+      "confidence": 0.997,
+      "zone": "far-short-left",
+      "context": "rally",
+      "nearest_line": "left-edge"
+    },
+    {
+      "frame": 293,
+      "court_x_m": 6.372,
+      "court_y_m": 5.584,
+      "decision": "IN",
+      "margin_cm": 326.1,
+      "confidence": 1.0,
+      "zone": "near-short-center",
+      "context": "rally",
+      "nearest_line": "right-edge"
+    },
+    {
+      "frame": 340,
+      "court_x_m": 5.203,
+      "court_y_m": 23.753,
+      "decision": "IN",
+      "margin_cm": 5.0,
+      "confidence": 0.043,
+      "zone": "far-deep-center",
+      "context": "rally",
+      "nearest_line": "far-edge"
+    },
+    {
+      "frame": 429,
+      "court_x_m": 2.181,
+      "court_y_m": 16.443,
+      "decision": "IN",
+      "margin_cm": 84.4,
+      "confidence": 0.796,
+      "zone": "far-short-left",
+      "context": "rally",
+      "nearest_line": "left-edge"
+    },
+    {
+      "frame": 474,
+      "court_x_m": 10.305,
+      "court_y_m": 19.061,
+      "decision": "OUT",
+      "margin_cm": -67.2,
+      "confidence": 0.628,
+      "zone": "far-mid-right",
+      "context": "rally",
+      "nearest_line": "right-edge"
+    },
+    {
+      "frame": 562,
+      "court_x_m": 2.385,
+      "court_y_m": 14.586,
+      "decision": "IN",
+      "margin_cm": 104.8,
+      "confidence": 0.91,
+      "zone": "far-short-left",
+      "context": "rally",
+      "nearest_line": "left-edge"
+    }
+  ],
+  "bounce_zones": {
+    "far-deep-center": 2,
+    "far-mid-right": 1,
+    "far-short-left": 3,
+    "far-short-right": 1,
+    "near-mid-left": 1,
+    "near-short-center": 1
+  },
+  "notes": [
+    "Shot speeds are court-plane estimates between contact events.",
+    "Confidence < 0.6 marks a close call (margin within measurement noise)."
+  ]
+}
