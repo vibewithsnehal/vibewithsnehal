@@ -117,6 +117,35 @@ def _shot_speeds(
     return speeds
 
 
+def build_rally(
+    index: int,
+    points: list,  # TrackPoints covering the rally
+    bounces: list[BounceEvent],
+    hits: list[HitEvent],
+    calls: list[LineCall],
+    fps: float,
+) -> tuple[Rally, list[float]]:
+    """Build one rally's stats.  Returns (rally, shot speeds in km/h)."""
+    # Contact sequence for speed estimation: bounces carry court positions
+    # via their calls; order all contacts by frame.
+    contacts = sorted([(c.frame, c.court_xy) for c in calls], key=lambda t: t[0])
+    speeds = _shot_speeds(contacts, fps)
+    start_f, end_f = points[0].frame, points[-1].frame
+    # Shots: every shot ends in a bounce (or a detected racquet contact
+    # interrupts it), so take the stronger of the two signals.
+    rally = Rally(
+        index=index,
+        start_frame=start_f,
+        end_frame=end_f,
+        shots=max(len(hits) + 1, len(bounces)),
+        bounces=len(bounces),
+        duration_s=(end_f - start_f) / fps,
+        terminal_call=calls[-1].decision if calls else None,
+        avg_shot_speed_kmh=float(np.mean(speeds)) if speeds else None,
+    )
+    return rally, speeds
+
+
 def compile_stats(
     segments: list[list],  # list of track segments (TrackPoint lists)
     segment_events: list[tuple[list[BounceEvent], list[HitEvent], list[LineCall]]],
@@ -129,28 +158,7 @@ def compile_stats(
         if not seg or not bounces:
             continue
         rally_idx += 1
-        start_f, end_f = seg[0].frame, seg[-1].frame
-
-        # Contact sequence for speed estimation: bounces carry court positions
-        # via their calls; order all contacts by frame.
-        contacts = sorted(
-            [(c.frame, c.court_xy) for c in calls], key=lambda t: t[0]
-        )
-        speeds = _shot_speeds(contacts, fps)
-
-        terminal = calls[-1].decision if calls else None
-        # Shots: every shot ends in a bounce (or a detected racquet contact
-        # interrupts it), so take the stronger of the two signals.
-        rally = Rally(
-            index=rally_idx,
-            start_frame=start_f,
-            end_frame=end_f,
-            shots=max(len(hits) + 1, len(bounces)),
-            bounces=len(bounces),
-            duration_s=(end_f - start_f) / fps,
-            terminal_call=terminal,
-            avg_shot_speed_kmh=float(np.mean(speeds)) if speeds else None,
-        )
+        rally, speeds = build_rally(rally_idx, seg, bounces, hits, calls, fps)
         stats.rallies.append(rally)
         stats.calls.extend(calls)
         stats.shot_speeds_kmh.extend(speeds)

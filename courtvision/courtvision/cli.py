@@ -1,6 +1,9 @@
 """Command line interface.
 
     courtvision analyze match.mp4 --out out/ [--corners corners.json] [--mode singles]
+    courtvision live 0 --serve 8765            # webcam, watch at http://localhost:8765
+    courtvision live rtsp://cam/stream         # ip camera
+    courtvision live sim --serve 8765          # simulated live match (no camera needed)
     courtvision demo --out demo/
 """
 
@@ -9,8 +12,12 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+import time
 from pathlib import Path
 
+import cv2
+
+from .live import LiveAnalyzer, LiveAnnotator, LiveStreamServer
 from .pipeline import AnalyzerConfig, analyze_video, _iter_video
 from .overlay import render_overlay_video
 from .stats import render_zone_heatmap
@@ -112,6 +119,120 @@ def cmd_demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fmt_t(frame: int, fps: float) -> str:
+    t = frame / fps
+    return f"{int(t // 60):02d}:{t % 60:04.1f}"
+
+
+def cmd_live(args: argparse.Namespace) -> int:
+    source = args.source
+    if source == "sim":
+        sim_path = Path(args.out) / "live_sim.mp4"
+        if not sim_path.exists():
+            print("rendering simulated match for the live demo...")
+            MatchRenderer().render_match(video_path=sim_path)
+        source = str(sim_path)
+    cap = cv2.VideoCapture(int(source) if source.isdigit() else source)
+    if not cap.isOpened():
+        print(f"cannot open source: {args.source}", file=sys.stderr)
+        return 1
+    fps = args.fps or cap.get(cv2.CAP_PROP_FPS) or 30.0
+    is_file = not source.isdigit() and Path(source).exists()
+
+    config = AnalyzerConfig(mode=args.mode, corners_file=args.corners)
+    analyzer = LiveAnalyzer(fps=fps, config=config)
+    annotator = LiveAnnotator(analyzer)
+
+    server = None
+    if args.serve is not None:
+        server = LiveStreamServer(port=args.serve)
+        server.start()
+        print(f"live view: http://localhost:{server.port}/  (stats at /stats.json)")
+
+    writer = None
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+
+    frame_period = 1.0 / fps
+    next_deadline = time.monotonic()
+    print("watching... (Ctrl+C to stop)")
+    try:
+        while True:
+            ok, frame = cap.read()
+            if not ok:
+                break
+            events = analyzer.process(frame)
+            for e in events:
+                _print_live_event(e, fps)
+            annotated = annotator.annotate(frame, events)
+            if args.record:
+                if writer is None:
+                    writer = cv2.VideoWriter(
+                        str(out / "live_annotated.mp4"),
+                        cv2.VideoWriter_fourcc(*"mp4v"),
+                        fps,
+                        (annotated.shape[1], annotated.shape[0]),
+                    )
+                writer.write(annotated)
+            if server is not None:
+                server.update(annotated, analyzer.stats)
+            # Pace file sources to wall-clock speed so "live" means live;
+            # real cameras pace themselves.
+            if is_file and not args.fast:
+                next_deadline += frame_period
+                delay = next_deadline - time.monotonic()
+                if delay > 0:
+                    time.sleep(delay)
+    except KeyboardInterrupt:
+        print("\nstopping...")
+    finally:
+        for e in analyzer.finish():
+            _print_live_event(e, fps)
+        cap.release()
+        if writer is not None:
+            writer.release()
+        (out / "live_stats.json").write_text(analyzer.stats.to_json())
+        print(f"stats written to {out / 'live_stats.json'}")
+        if server is not None and args.linger and analyzer.frame_idx >= 0:
+            print(f"stream ended - viewer stays up at http://localhost:{server.port}/ (Ctrl+C to exit)")
+            try:
+                while True:
+                    time.sleep(1.0)
+            except KeyboardInterrupt:
+                pass
+        if server is not None:
+            server.stop()
+
+    d = analyzer.stats.to_dict()["summary"]
+    print(
+        f"\nsession: {d['rallies']} rallies, {d['total_bounces_called']} calls "
+        f"(IN {d['in']} / OUT {d['out']}), {d['close_calls']} close"
+    )
+    return 0
+
+
+def _print_live_event(e, fps: float) -> None:
+    t = _fmt_t(e.frame, fps)
+    if e.type == "calibrated":
+        print(f"[{t}] court calibrated - line calling active")
+    elif e.type == "rally_start":
+        print(f"[{t}] rally started")
+    elif e.type == "call" and e.call is not None:
+        c = e.call
+        flag = "" if c.confidence >= 0.6 else "  (close call)"
+        print(
+            f"[{t}] {c.decision:3s}  margin {c.margin_m * 100:+6.1f} cm"
+            f"  conf {c.confidence:.0%}  at ({c.court_xy[0]:.2f}, {c.court_xy[1]:.2f}) m{flag}"
+        )
+    elif e.type == "rally_end" and e.rally is not None:
+        r = e.rally
+        speed = f", avg {r.avg_shot_speed_kmh:.0f} km/h" if r.avg_shot_speed_kmh else ""
+        print(
+            f"[{t}] rally over: {r.shots} shots, {r.bounces} bounces, "
+            f"{r.duration_s:.1f}s{speed} - last ball {r.terminal_call}"
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="courtvision",
@@ -131,6 +252,36 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_an.add_argument("--no-overlay", action="store_true", help="skip the annotated replay")
     p_an.set_defaults(func=cmd_analyze)
+
+    p_live = sub.add_parser("live", help="analyze a live source, calling lines in real time")
+    p_live.add_argument(
+        "source",
+        help="camera index (e.g. 0), stream URL (rtsp/http), video file, or 'sim' "
+        "for a simulated live match",
+    )
+    p_live.add_argument("--out", default="courtvision-live", help="output directory")
+    p_live.add_argument("--mode", choices=["singles", "doubles"], default="singles")
+    p_live.add_argument("--corners", default=None, help="corner-pixel JSON (see analyze)")
+    p_live.add_argument(
+        "--serve",
+        type=int,
+        nargs="?",
+        const=8765,
+        default=None,
+        metavar="PORT",
+        help="serve the annotated feed + live stats over HTTP (default port 8765)",
+    )
+    p_live.add_argument("--record", action="store_true", help="record the annotated feed")
+    p_live.add_argument("--fps", type=float, default=None, help="override source fps")
+    p_live.add_argument(
+        "--fast", action="store_true", help="file sources: run flat out instead of real time"
+    )
+    p_live.add_argument(
+        "--linger",
+        action="store_true",
+        help="keep the web viewer up after the stream ends",
+    )
+    p_live.set_defaults(func=cmd_live)
 
     p_demo = sub.add_parser("demo", help="generate a synthetic match and analyze it")
     p_demo.add_argument("--out", default="courtvision-demo", help="output directory")

@@ -64,6 +64,17 @@ def _reverses_horizontal_direction(seg: list[TrackPoint], event: BounceEvent) ->
     )
 
 
+def is_true_bounce(
+    seg: list[TrackPoint], event: BounceEvent, calib: CourtCalibration
+) -> bool:
+    """Shared bounce-vs-racquet-hit classification for batch and live modes."""
+    cx, cy = calib.image_to_court(np.array([event.image_xy]))[0]
+    overshoot = court.DOUBLES_COURT.signed_distance(float(cx), float(cy))
+    if overshoot > MAX_PLAUSIBLE_BOUNCE_OVERSHOOT_M:
+        return False
+    return not _reverses_horizontal_direction(seg, event)
+
+
 @dataclass
 class AnalysisResult:
     calibration: CourtCalibration
@@ -155,11 +166,7 @@ def analyze_frames(
         for seg in group:
             seg_bounces: list[BounceEvent] = []
             for b in detect_bounces(seg):
-                cx, cy = calib.image_to_court(np.array([b.image_xy]))[0]
-                overshoot = court.DOUBLES_COURT.signed_distance(float(cx), float(cy))
-                if overshoot > MAX_PLAUSIBLE_BOUNCE_OVERSHOOT_M or _reverses_horizontal_direction(
-                    seg, b
-                ):
+                if not is_true_bounce(seg, b, calib):
                     hits.append(HitEvent(frame=b.frame, image_xy=b.image_xy))
                     continue
                 seg_bounces.append(b)

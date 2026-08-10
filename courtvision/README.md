@@ -1,12 +1,15 @@
 # 🎾 CourtVision
 
-**AI tennis line calling and match stats — from nothing but the video.**
+**AI tennis line calling and match stats — live or from recordings, from nothing
+but the video.**
 
-Point it at a fixed-camera recording of a tennis court and it will find the court,
-track the ball, detect every bounce, call each one **IN** or **OUT** with a margin
-and a confidence, and compile match statistics — rallies, shot counts, ball speeds,
-and a bounce heatmap. 100% local, classical computer vision (OpenCV + NumPy), no
-GPU and no cloud.
+Point it at a fixed camera watching a tennis court — a webcam, an RTSP stream, or
+a recording — and it will find the court, track the ball, detect every bounce,
+call each one **IN** or **OUT** with a margin and a confidence, and compile match
+statistics — rallies, shot counts, ball speeds, and a bounce heatmap. In live mode
+calls are announced ~0.2 s after the ball lands, with an in-browser annotated feed
+and live stats. 100% local, classical computer vision (OpenCV + NumPy), no GPU and
+no cloud.
 
 <div align="center">
 <img src="./assets/call_out.png" alt="CourtVision calling a ball OUT behind the far baseline" width="80%" />
@@ -67,6 +70,38 @@ courtvision analyze match.mp4 --out out/
 courtvision analyze match.mp4 --out out/ --corners corners.json --mode singles
 ```
 
+### Live mode
+
+```bash
+# webcam 0, watch the annotated feed + live stats at http://localhost:8765
+courtvision live 0 --serve
+
+# an IP camera
+courtvision live rtsp://192.168.1.20/stream --serve --record
+
+# no camera handy? simulated live match, paced in real time
+courtvision live sim --serve
+```
+
+Calls stream to the console the moment they're ruled:
+
+```
+[00:00.2] court calibrated - line calling active
+[00:01.0] rally started
+[00:02.3] IN   margin +216.5 cm  conf 99%  at (7.47, 17.98) m
+[00:05.4] OUT  margin  -20.6 cm  conf 17%  at (6.75, 24.01) m  (close call)
+[00:06.7] rally over: 3 shots, 3 bounces, 4.7s, avg 39 km/h - last ball OUT
+```
+
+The `--serve` viewer is a dependency-free MJPEG server: `/` is the viewer page,
+`/stream` the annotated feed, `/stats.json` the cumulative stats — poll it from a
+scoreboard or OBS overlay. A verdict needs a few frames of post-bounce trajectory
+(to confirm the contact kink and rule out a racquet hit), so the typical
+call latency is ~6 frames — **0.2 s at 30 fps** — with a hard test-enforced bound
+of 0.6 s even through brief occlusions. Live mode runs the *same* detection,
+tracking, and calling code as batch mode; a parity test asserts identical
+verdicts on the same footage.
+
 `corners.json` is four pixel coordinates — near-left, near-right, far-right,
 far-left doubles corners:
 
@@ -93,7 +128,10 @@ CourtVision currently scores:
   confidence rather than false certainty
 - automatic court detection lands within **5 px** of the true corners
 
-Run it yourself: `python -m pytest` (27 tests) or `courtvision demo`.
+- live mode reproduces batch verdicts exactly, with median call latency ≤ 8
+  frames
+
+Run it yourself: `python -m pytest` (34 tests) or `courtvision demo`.
 
 ## Honest limitations
 
@@ -121,8 +159,9 @@ courtvision/
 ├── bounce.py       # bounce & hit events from trajectory kinks
 ├── calls.py        # IN/OUT with margin + confidence, ITF line rules
 ├── stats.py        # rallies, speeds, heatmaps → JSON
-├── overlay.py      # annotated replay renderer
+├── overlay.py      # annotated rendering (shared by replay + live)
+├── live.py         # incremental engine, live overlay, MJPEG web viewer
 ├── synthetic.py    # physics-simulated match generator (powers the tests)
-├── pipeline.py     # end-to-end orchestration
-└── cli.py          # `courtvision analyze` / `courtvision demo`
+├── pipeline.py     # end-to-end batch orchestration
+└── cli.py          # `courtvision analyze` / `live` / `demo`
 ```
