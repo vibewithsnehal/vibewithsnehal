@@ -72,7 +72,28 @@ courtvision analyze match.mp4 --out out/
 courtvision analyze match.mp4 --out out/ --corners corners.json --mode singles
 ```
 
-### Take it to a court — your phone is the camera
+### Run it ON the phone — no computer at all
+
+The entire pipeline is also ported to JavaScript and ships as a single-file web
+app (`webapp/`): camera, corner-tap calibration with a magnifier loupe, live
+IN/OUT verdicts with margins, spoken calls ("Out!" — like a real line judge),
+haptics, rally stats, and a session summary with a top-view bounce map. All
+processing happens on-device in the browser; nothing is uploaded anywhere.
+
+- Build: `python webapp/build.py` → `webapp/dist/courtvision-app.html` — one
+  file, host it on any static HTTPS host (GitHub Pages works: enable Pages for
+  this repo and open
+  `/courtvision/webapp/dist/courtvision-app.html`). HTTPS is required for
+  camera access.
+- Open it on the phone → *Open the camera* → tap the four court corners →
+  play. A *Watch the demo* mode runs a simulated rally through the same
+  engine, so you can try it anywhere.
+- Verified: the JS engine reproduces the Python pipeline's calls exactly on a
+  shared fixture (`node webapp/test/test_core.mjs` — homography, tracking,
+  bounce, and call parity, plus a full JS-only detector e2e), and a headless-
+  browser test drives the built app's demo to 9 correct calls.
+
+### Take it to a court — with a laptop as the brain
 
 No apps to install: the phone streams through its own browser.
 
@@ -205,4 +226,9 @@ courtvision/
 ├── synthetic.py    # physics-simulated match generator (powers the tests)
 ├── pipeline.py     # end-to-end batch orchestration
 └── cli.py          # `courtvision analyze` / `live` / `demo`
+webapp/
+├── core.js         # the same pipeline, ported to JS (runs on the phone)
+├── index.html      # the app UI: viewfinder, calibration, verdicts, stats
+├── build.py        # inlines core.js -> dist/courtvision-app.html (one file)
+└── test/           # Node parity tests + the Python-exported fixture
 ```
