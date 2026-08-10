@@ -95,6 +95,7 @@ class AnalyzerConfig:
     calibration_frame: int = 5  # frame index used for auto-detection
     rally_gap_frames: int = 30  # ball absent this long -> the rally is over
     fps_override: float | None = None
+    use_color_prior: bool = True  # optic-yellow ball filter; off for other balls
 
 
 def _iter_video(path: str | Path) -> tuple[Iterator[np.ndarray], float, int, int]:
@@ -124,7 +125,7 @@ def analyze_frames(
 ) -> AnalysisResult:
     """Analyze an in-memory or streamed frame sequence."""
     config = config or AnalyzerConfig()
-    detector = BallDetector()
+    detector = BallDetector(use_color_prior=config.use_color_prior)
     tracker = BallTracker()
 
     calib = calibration

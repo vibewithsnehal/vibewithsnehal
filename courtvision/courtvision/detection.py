@@ -1,11 +1,17 @@
 """Ball candidate detection.
 
 The ball is a small, fast, roughly circular blob that differs from the
-background.  We use background subtraction (MOG2) plus shape filters
-(area window, circularity) and an optic-yellow color prior: regulation
-balls are yellow, while the usual false positives — player fragments,
-compression noise on lines, shadows — are not.  Disable the color prior
-(``use_color_prior=False``) for footage with a non-yellow ball.
+background.  We use background subtraction (MOG2) plus three filters:
+
+- shape: area window and circularity;
+- color: an optic-yellow prior — regulation balls are yellow, while the
+  usual false positives (player fragments, compression noise on lines,
+  shadows) are not.  Disable with ``use_color_prior=False`` for footage
+  with a non-yellow ball;
+- static-region suppression: a grid cell that has produced candidates in
+  most of the trailing window is a quasi-stationary object — a swaying
+  player, a flapping net band, a spectator — not a ball.  The ball moves;
+  it never lingers in one cell that long.
 
 Each frame yields zero or more :class:`BallCandidate`; the tracker decides
 which of them is actually the ball.
@@ -13,6 +19,7 @@ which of them is actually the ball.
 
 from __future__ import annotations
 
+from collections import Counter, deque
 from dataclasses import dataclass
 
 import cv2
@@ -43,6 +50,11 @@ class BallDetector:
         min_saturation: int = 60,
         min_value: int = 90,
         warmup_frames: int = 20,
+        static_cell_px: int = 32,
+        static_window: int = 60,
+        static_threshold: int = 25,
+        player_min_area: float = 3000.0,
+        player_margin_px: int = 15,
     ) -> None:
         self.min_area = min_area
         self.max_area = max_area
@@ -52,10 +64,29 @@ class BallDetector:
         self.min_saturation = min_saturation
         self.min_value = min_value
         self.warmup_frames = warmup_frames
+        self.static_cell_px = static_cell_px
+        self.static_window = static_window
+        self.static_threshold = static_threshold
+        self.player_min_area = player_min_area
+        self.player_margin_px = player_margin_px
         self._frames_seen = 0
+        self._cell_history: deque[set[tuple[int, int]]] = deque()
+        self._cell_counts: Counter = Counter()
         self._bg = cv2.createBackgroundSubtractorMOG2(
             history=history, varThreshold=24, detectShadows=False
         )
+
+    def _cell(self, x: float, y: float) -> tuple[int, int]:
+        return (int(x // self.static_cell_px), int(y // self.static_cell_px))
+
+    def _update_static_map(self, cells: set[tuple[int, int]]) -> None:
+        self._cell_history.append(cells)
+        self._cell_counts.update(cells)
+        if len(self._cell_history) > self.static_window:
+            for cell in self._cell_history.popleft():
+                self._cell_counts[cell] -= 1
+                if self._cell_counts[cell] <= 0:
+                    del self._cell_counts[cell]
 
     def _is_ball_colored(self, frame: np.ndarray, x: float, y: float) -> bool:
         h, w = frame.shape[:2]
@@ -69,12 +100,32 @@ class BallDetector:
             and hsv[2] >= self.min_value
         )
 
+    def _player_exclusion_mask(self, fg: np.ndarray) -> np.ndarray | None:
+        """Mask covering large moving objects (players) plus a safety margin.
+
+        A player's foreground is often fragmented (MOG2 partially absorbs a
+        slowly moving body, compression shreds the edges); dilating first
+        merges the fragments so the whole body registers as one large blob.
+        Ball candidates inside the mask are rejected — tiny yellow-ish
+        shards of a moving player are the main source of phantom bounces.
+        """
+        merged = cv2.dilate(fg, np.ones((9, 9), np.uint8))
+        contours, _ = cv2.findContours(merged, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        big = [c for c in contours if cv2.contourArea(c) > self.player_min_area]
+        if not big:
+            return None
+        mask = np.zeros(fg.shape, dtype=np.uint8)
+        cv2.drawContours(mask, big, -1, 255, -1)
+        k = 2 * self.player_margin_px + 1
+        return cv2.dilate(mask, np.ones((k, k), np.uint8))
+
     def detect(self, frame: np.ndarray) -> list[BallCandidate]:
         fg = self._bg.apply(frame)
         # The background model is unreliable until it has seen some frames.
         self._frames_seen += 1
         if self._frames_seen <= self.warmup_frames:
             return []
+        exclusion = self._player_exclusion_mask(fg)
         fg = cv2.morphologyEx(fg, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
         contours, _ = cv2.findContours(fg, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         candidates: list[BallCandidate] = []
@@ -92,6 +143,8 @@ class BallDetector:
             if m["m00"] <= 0:
                 continue
             cx, cy = m["m10"] / m["m00"], m["m01"] / m["m00"]
+            if exclusion is not None and exclusion[int(cy), int(cx)] > 0:
+                continue
             if self.use_color_prior and not self._is_ball_colored(frame, cx, cy):
                 continue
             candidates.append(
@@ -102,5 +155,16 @@ class BallDetector:
                     circularity=float(min(circularity, 1.0)),
                 )
             )
-        candidates.sort(key=lambda c: -c.score)
-        return candidates
+        # Static-region suppression: record where candidates appear, reject
+        # the ones sitting in a cell that's been occupied for most of the
+        # trailing window.  (Cells are recorded before rejection so a hot
+        # zone stays hot.)
+        cells = {self._cell(c.x, c.y) for c in candidates}
+        kept = [
+            c
+            for c in candidates
+            if self._cell_counts[self._cell(c.x, c.y)] < self.static_threshold
+        ]
+        self._update_static_map(cells)
+        kept.sort(key=lambda c: -c.score)
+        return kept

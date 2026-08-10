@@ -17,7 +17,9 @@ from pathlib import Path
 
 import cv2
 
+from .calibration import CourtCalibration
 from .live import LiveAnalyzer, LiveAnnotator, LiveStreamServer
+from .phone import PhoneIngestServer
 from .pipeline import AnalyzerConfig, analyze_video, _iter_video
 from .overlay import render_overlay_video
 from .stats import render_zone_heatmap
@@ -52,7 +54,11 @@ def _print_summary(result) -> None:
 def cmd_analyze(args: argparse.Namespace) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
-    config = AnalyzerConfig(mode=args.mode, corners_file=args.corners)
+    config = AnalyzerConfig(
+        mode=args.mode,
+        corners_file=args.corners,
+        use_color_prior=not args.no_color_prior,
+    )
     result = analyze_video(args.video, config)
 
     stats_path = out / "stats.json"
@@ -124,8 +130,126 @@ def _fmt_t(frame: int, fps: float) -> str:
     return f"{int(t // 60):02d}:{t % 60:04.1f}"
 
 
+def _live_phone(args: argparse.Namespace) -> int:
+    """Phone-as-camera: browser page streams frames in, phone shows the calls."""
+    import numpy as np
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    holder: dict = {}  # {'a': LiveAnalyzer} once enough frames arrived
+
+    ingest = PhoneIngestServer(
+        port=args.phone_port,
+        cert_dir=out,
+        stats_supplier=lambda: holder["a"].stats.to_json() if "a" in holder else "{}",
+    )
+    ingest.start()
+    print("phone camera mode")
+    print(f"  1. connect the phone to the same wifi as this machine")
+    print(f"  2. open  {ingest.url}  on the phone")
+    if ingest.tls:
+        print("     (self-signed certificate: tap through the browser warning once)")
+    else:
+        print("     WARNING: openssl not found, serving plain http - most phone")
+        print("     browsers will refuse camera access without https")
+    print(f"  3. follow the 3 steps on screen (camera -> tap corners -> stream)")
+
+    server = None
+    if args.serve is not None:
+        server = LiveStreamServer(port=args.serve)
+        server.start()
+        print(f"  laptop view: http://localhost:{server.port}/")
+    print("waiting for the phone... (Ctrl+C to stop)")
+
+    config = AnalyzerConfig(
+        mode=args.mode,
+        corners_file=args.corners,
+        use_color_prior=not args.no_color_prior,
+    )
+    analyzer: LiveAnalyzer | None = None
+    annotator: LiveAnnotator | None = None
+    writer = None
+    pending_calib: CourtCalibration | None = None
+    buffer: list = []
+    arrivals: list[float] = []
+
+    try:
+        while True:
+            frame = ingest.next_frame(timeout=1.0)
+
+            corners = ingest.take_corners()
+            if corners is not None:
+                calib = CourtCalibration.from_corners(np.array(corners))
+                (out / "corners.json").write_text(
+                    json.dumps({"corners": corners}, indent=2)
+                )
+                if analyzer is not None:
+                    analyzer.set_calibration(calib)
+                else:
+                    pending_calib = calib
+                print("corners received - calibration saved to corners.json")
+
+            if frame is None:
+                continue
+            arrivals.append(time.monotonic())
+
+            if analyzer is None:
+                buffer.append(frame)
+                if len(buffer) < 15:
+                    continue
+                fps = (len(arrivals) - 1) / max(arrivals[-1] - arrivals[0], 1e-6)
+                fps = float(min(max(fps, 5.0), 60.0))
+                print(f"phone connected - measured ~{fps:.0f} fps")
+                analyzer = LiveAnalyzer(fps=fps, config=config, calibration=pending_calib)
+                annotator = LiveAnnotator(analyzer)
+                holder["a"] = analyzer
+                frames_now, buffer = buffer, []
+            else:
+                frames_now = [frame]
+
+            for f in frames_now:
+                events = analyzer.process(f)
+                for e in events:
+                    _print_live_event(e, analyzer.fps)
+                annotated = annotator.annotate(f, events)
+                if args.record:
+                    if writer is None:
+                        writer = cv2.VideoWriter(
+                            str(out / "live_annotated.mp4"),
+                            cv2.VideoWriter_fourcc(*"mp4v"),
+                            analyzer.fps,
+                            (annotated.shape[1], annotated.shape[0]),
+                        )
+                    writer.write(annotated)
+                if server is not None:
+                    server.update(annotated, analyzer.stats)
+    except KeyboardInterrupt:
+        print("\nstopping...")
+    finally:
+        if analyzer is not None:
+            for e in analyzer.finish():
+                _print_live_event(e, analyzer.fps)
+            (out / "live_stats.json").write_text(analyzer.stats.to_json())
+            print(f"stats written to {out / 'live_stats.json'}")
+        if writer is not None:
+            writer.release()
+        ingest.stop()
+        if server is not None:
+            server.stop()
+
+    if analyzer is not None:
+        d = analyzer.stats.to_dict()["summary"]
+        print(
+            f"\nsession: {d['rallies']} rallies, {d['total_bounces_called']} calls "
+            f"(IN {d['in']} / OUT {d['out']}), {d['close_calls']} close"
+        )
+    return 0
+
+
 def cmd_live(args: argparse.Namespace) -> int:
     source = args.source
+    if source == "phone":
+        return _live_phone(args)
     if source == "sim":
         sim_path = Path(args.out) / "live_sim.mp4"
         if not sim_path.exists():
@@ -139,7 +263,11 @@ def cmd_live(args: argparse.Namespace) -> int:
     fps = args.fps or cap.get(cv2.CAP_PROP_FPS) or 30.0
     is_file = not source.isdigit() and Path(source).exists()
 
-    config = AnalyzerConfig(mode=args.mode, corners_file=args.corners)
+    config = AnalyzerConfig(
+        mode=args.mode,
+        corners_file=args.corners,
+        use_color_prior=not args.no_color_prior,
+    )
     analyzer = LiveAnalyzer(fps=fps, config=config)
     annotator = LiveAnnotator(analyzer)
 
@@ -251,13 +379,18 @@ def main(argv: list[str] | None = None) -> int:
         "(near-left, near-right, far-right, far-left); omit for auto-detection",
     )
     p_an.add_argument("--no-overlay", action="store_true", help="skip the annotated replay")
+    p_an.add_argument(
+        "--no-color-prior",
+        action="store_true",
+        help="disable the optic-yellow ball filter (non-yellow balls, odd lighting)",
+    )
     p_an.set_defaults(func=cmd_analyze)
 
     p_live = sub.add_parser("live", help="analyze a live source, calling lines in real time")
     p_live.add_argument(
         "source",
-        help="camera index (e.g. 0), stream URL (rtsp/http), video file, or 'sim' "
-        "for a simulated live match",
+        help="camera index (e.g. 0), stream URL (rtsp/http), video file, 'phone' "
+        "to stream from a phone's browser, or 'sim' for a simulated live match",
     )
     p_live.add_argument("--out", default="courtvision-live", help="output directory")
     p_live.add_argument("--mode", choices=["singles", "doubles"], default="singles")
@@ -280,6 +413,17 @@ def main(argv: list[str] | None = None) -> int:
         "--linger",
         action="store_true",
         help="keep the web viewer up after the stream ends",
+    )
+    p_live.add_argument(
+        "--phone-port",
+        type=int,
+        default=9443,
+        help="port for the phone camera page (source 'phone')",
+    )
+    p_live.add_argument(
+        "--no-color-prior",
+        action="store_true",
+        help="disable the optic-yellow ball filter (non-yellow balls, odd lighting)",
     )
     p_live.set_defaults(func=cmd_live)
 

@@ -33,8 +33,10 @@ video ──► court detection ──► ball detection ──► tracking ─�
    For maximum accuracy you can instead supply the four doubles-court corner pixels
    (`--corners corners.json`).
 2. **Ball detection** — background subtraction plus shape filters (area,
-   circularity) and an optic-yellow color prior that rejects player fragments and
-   compression noise.
+   circularity), an optic-yellow color prior, large-moving-object (player)
+   exclusion zones, and static-region suppression — together these reject
+   player fragments, spectators, and compression noise. Verified against
+   per-frame JPEG compression, i.e. exactly what a phone camera stream sends.
 3. **Tracking** — a constant-velocity Kalman filter with gating; brief dropouts are
    coasted through and back-filled, re-locks start new track segments.
 4. **Bounce detection** — a bounce is a *kink* in the vertical image velocity: the
@@ -70,7 +72,43 @@ courtvision analyze match.mp4 --out out/
 courtvision analyze match.mp4 --out out/ --corners corners.json --mode singles
 ```
 
-### Live mode
+### Take it to a court — your phone is the camera
+
+No apps to install: the phone streams through its own browser.
+
+```bash
+courtvision live phone --serve --record
+```
+
+1. Connect the phone to the same wifi as your laptop and open the printed
+   `https://<laptop-ip>:9443/` on the phone (self-signed certificate — tap
+   through the warning once; traffic never leaves your network).
+2. **Mount the phone** — landscape, steady (tripod, fence mount, or wedged
+   against a bag), elevated if you can (head height minimum, higher is better),
+   centered behind one baseline, with **the whole court in frame**.
+3. On the phone: start the camera → **tap the four doubles-court corners**
+   (near-left → near-right → far-right → far-left, the *outer* edges of the
+   outermost lines) → start streaming. Or skip the taps and let auto-detection
+   try.
+4. Play. Calls stream to the laptop console, the annotated feed is at
+   `http://localhost:8765`, and the phone screen itself becomes a live
+   scoreboard showing every call. Corners are saved to `corners.json` so a
+   recording from the same mount can be re-analyzed later with `analyze`.
+
+Court-day tips:
+
+- **Lock exposure/focus** in the camera view if your browser offers it; avoid
+  shooting into the sun.
+- Higher and farther is more accurate than low and close: bounce localization
+  degrades at the far court when the camera is at eye level.
+- Playing with non-yellow balls (or under sodium lights)? add
+  `--no-color-prior`.
+- Wind-blown banners, spectators, and the players themselves are filtered by
+  motion/color/static-region logic, but a *moving camera is not supported* —
+  if the phone gets bumped, redo the corner taps (the page lets you re-tap
+  mid-session).
+
+### Other live sources
 
 ```bash
 # webcam 0, watch the annotated feed + live stats at http://localhost:8765
@@ -130,8 +168,10 @@ CourtVision currently scores:
 
 - live mode reproduces batch verdicts exactly, with median call latency ≤ 8
   frames
+- 9/9 calls correct through *per-frame JPEG* compression — the phone-camera
+  streaming path — with zero phantom calls
 
-Run it yourself: `python -m pytest` (34 tests) or `courtvision demo`.
+Run it yourself: `python -m pytest` (42 tests) or `courtvision demo`.
 
 ## Honest limitations
 
@@ -161,6 +201,7 @@ courtvision/
 ├── stats.py        # rallies, speeds, heatmaps → JSON
 ├── overlay.py      # annotated rendering (shared by replay + live)
 ├── live.py         # incremental engine, live overlay, MJPEG web viewer
+├── phone.py        # phone-as-camera: HTTPS capture page, corner taps, ingest
 ├── synthetic.py    # physics-simulated match generator (powers the tests)
 ├── pipeline.py     # end-to-end batch orchestration
 └── cli.py          # `courtvision analyze` / `live` / `demo`

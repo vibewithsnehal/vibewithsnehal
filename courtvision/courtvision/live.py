@@ -97,7 +97,7 @@ class LiveAnalyzer:
     ) -> None:
         self.fps = fps
         self.config = config or AnalyzerConfig()
-        self.detector = BallDetector()
+        self.detector = BallDetector(use_color_prior=self.config.use_color_prior)
         self.tracker = BallTracker()
         self.calibration = calibration
         if self.calibration is None and self.config.corners_file:
@@ -153,6 +153,12 @@ class LiveAnalyzer:
         if self._rally_open:
             events.extend(self._close_rally())
         return events
+
+    def set_calibration(self, calibration: CourtCalibration) -> None:
+        """Apply (or replace) the calibration mid-stream, e.g. from tapped corners."""
+        self.calibration = calibration
+        self.caller = None  # rebuilt with the new homography on the next frame
+        self._calibrated_announced = False
 
     # -- internals ----------------------------------------------------------
 
